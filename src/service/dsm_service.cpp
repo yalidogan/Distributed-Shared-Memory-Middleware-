@@ -1,20 +1,22 @@
 #include "service/dsm_service.hpp"
+#include "network/network_interface.hpp"
+#include "config/config.hpp"
 #include <iostream>
 
 DSMServiceImpl::DSMServiceImpl() {
     std::cout << "[DSM Service] Initialized local memory storage." << std::endl;
 }
 
-//RICAGRAWALA LOGIC
+//RICART AGRAWALA LOGIC
 
 Status DSMServiceImpl::ReceiveRaRequest(ServerContext* context, const RaRequestMsg* request, Empty* response) {
     // This logs when a friend asks for the lock
-    std::cout << "[RA] Node " << request->node_id() << " requests lock (Timestamp: " << request->timestamp() << ")" << std::endl;
+    std::cout << "[RA] Node " << request->sender_id() << " requests lock (Timestamp: " << request->timestamp() << ")" << std::endl;
     return Status::OK;
 }
 
 Status DSMServiceImpl::ReceiveRaReply(ServerContext* context, const RaReplyMsg* request, Empty* response) {
-    std::cout << "[RA] Node " << request->node_id() << " replied OK." << std::endl;
+    std::cout << "[RA] Node " << request->sender_id() << " replied OK." << std::endl;
     return Status::OK;
 }
 

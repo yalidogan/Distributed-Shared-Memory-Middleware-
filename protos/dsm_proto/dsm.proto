@@ -11,12 +11,13 @@ service DSMService {
 
 //RA Messages
 message RaRequestMsg {
-  int32 node_id = 1;
-  int32 timestamp = 2; // for RA algo 
+  int32 sender_id = 1;
+  int32 timestamp = 2;
+  string object_name = 3;
 }
 
 message RaReplyMsg {
-  int32 node_id = 1;
+  int32 sender_id = 1;
 }
 
 //Data Transfer Messages
