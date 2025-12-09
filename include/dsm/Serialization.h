@@ -1,72 +1,95 @@
 #pragma once
 
 #include <string>
-#include <cstdint>
+#include <vector>
 #include <cstring>
 #include <stdexcept>
+#include <type_traits>
 
 namespace dsm {
 
-/**
- * Basic serialization helpers.
- *
- * These convert between arbitrary C++ types and std::string (raw bytes).
- * The DSM core always deals with std::string internally, and your
- * templated API in DsmCore will call these.
- *
- * For now we support:
- *  - std::string (trivial)
- *  - int64_t     (binary, host endianness)
- *
- * You can add overloads/specializations for more types later.
- */
-
-//
-// std::string
-//
-
+    // ----------------------------------------------------------------
+    // std::string
+    // ----------------------------------------------------------------
     inline std::string serialize(const std::string& s) {
-        return s; // already bytes
+        return s;
     }
 
     inline void deserialize(const std::string& bytes, std::string& out) {
         out = bytes;
     }
 
-//
-// int64_t
-//
-
-    inline std::string serialize(int64_t value) {
-        std::string bytes(sizeof(int64_t), '\0');
-        // NOTE: this uses host endianness; fine for a controlled cluster.
-        std::memcpy(bytes.data(), &value, sizeof(int64_t));
+    // ----------------------------------------------------------------
+    // Generic Arithmetic Types (int, float, double, bool, etc.)
+    // ----------------------------------------------------------------
+    template <typename T>
+    typename std::enable_if<std::is_arithmetic<T>::value, std::string>::type
+    serialize(T value) {
+        std::string bytes(sizeof(T), '\0');
+        std::memcpy(bytes.data(), &value, sizeof(T));
         return bytes;
     }
 
-    inline void deserialize(const std::string& bytes, int64_t& out) {
-        if (bytes.size() != sizeof(int64_t)) {
-            throw std::runtime_error("dsm::deserialize<int64_t>: size mismatch");
+    template <typename T>
+    typename std::enable_if<std::is_arithmetic<T>::value, void>::type
+    deserialize(const std::string& bytes, T& out) {
+        if (bytes.size() != sizeof(T)) {
+            // It's okay to have zero bytes for empty init, but good to warn
+            if (bytes.empty()) { out = 0; return; }
+            throw std::runtime_error("dsm::deserialize size mismatch for arithmetic type");
         }
-        std::memcpy(&out, bytes.data(), sizeof(int64_t));
+        std::memcpy(&out, bytes.data(), sizeof(T));
     }
 
-//
-// You can add more overloads here as needed, e.g.:
-//
-// inline std::string serialize(int32_t value) { ... }
-// inline void deserialize(const std::string&, int32_t&);
-//
-// Or for your own structs, or later, protobuf messages.
-// For protobuf later, it'll look roughly like:
-//
-// template <typename T>
-// std::enable_if_t<std::is_base_of_v<google::protobuf::MessageLite, T>, std::string>
-// serialize(const T& msg) { ... }
-//
-// template <typename T>
-// std::enable_if_t<std::is_base_of_v<google::protobuf::MessageLite, T>, void>
-// deserialize(const std::string& bytes, T& msg) { ... }
-//
+    // ----------------------------------------------------------------
+    // 3. Generic Vector<T>
+    // ----------------------------------------------------------------
+    template <typename T>
+    std::string serialize(const std::vector<T>& v) {
+        std::string buffer;
+
+        size_t count = v.size();
+        buffer.append(reinterpret_cast<const char*>(&count), sizeof(size_t));
+
+        for (const auto& elem : v) {
+            std::string elem_bytes = serialize(elem);
+            size_t elem_size = elem_bytes.size();
+            buffer.append(reinterpret_cast<const char*>(&elem_size), sizeof(size_t));
+            buffer.append(elem_bytes);
+        }
+        return buffer;
+    }
+
+    template <typename T>
+    void deserialize(const std::string& bytes, std::vector<T>& out) {
+        if (bytes.size() < sizeof(size_t)) {
+            out.clear();
+            return;
+        }
+
+        const char* ptr = bytes.data();
+        const char* end = bytes.data() + bytes.size();
+
+        size_t count = 0;
+        std::memcpy(&count, ptr, sizeof(size_t));
+        ptr += sizeof(size_t);
+
+        out.resize(count);
+
+        for (size_t i = 0; i < count; ++i) {
+            if (ptr + sizeof(size_t) > end) break; // Safety check
+
+            size_t elem_size = 0;
+            std::memcpy(&elem_size, ptr, sizeof(size_t));
+            ptr += sizeof(size_t);
+
+            if (ptr + elem_size > end) break; // Safety check
+
+            std::string elem_bytes(ptr, elem_size);
+            ptr += elem_size;
+
+            deserialize(elem_bytes, out[i]);
+        }
+    }
 
 } // namespace dsm

@@ -1,0 +1,49 @@
+syntax = "proto3";
+package dsm;
+
+service DSMService {
+  // RA (Future work)
+  rpc ReceiveRaRequest(RaRequestMsg) returns (Empty);
+  rpc ReceiveRaReply(RaReplyMsg) returns (Empty);
+
+  // DSM Core Logic
+  // Used when a node wants to write to the Home (to update canonical)
+  rpc ReceiveWriteToHome(DsmUpdateMsg) returns (Empty);
+
+  // Used when the Home broadcasts updates to cache nodes
+  rpc ReceiveCacheUpdate(DsmUpdateMsg) returns (Empty);
+
+  // Used when a node wants to read from Home
+  rpc ReceiveDsmFetch(DsmFetchRequest) returns (DsmFetchReply);
+
+  rpc ReceiveRemoveToHome(DsmUpdateMsg) returns (Empty);
+  rpc ReceiveCacheRemove(DsmUpdateMsg) returns (Empty);
+}
+
+message Empty {}
+
+message RaRequestMsg {
+  int32 node_id = 1;
+  int32 timestamp = 2;
+}
+
+message RaReplyMsg {
+  int32 node_id = 1;
+}
+
+message DsmUpdateMsg {
+  string object_name = 1;
+  bytes data = 2;
+  int32 sender_node_id = 3; // ADDED: Crucial for DsmCore::onWriteToHome
+}
+
+message DsmFetchRequest {
+  string object_name = 1;
+  int32 requester_node_id = 2; // ADDED: Crucial for DsmCore::registerCacheNode
+}
+
+message DsmFetchReply {
+  string object_name = 1;
+  bytes data = 2;
+  bool found = 3;
+}

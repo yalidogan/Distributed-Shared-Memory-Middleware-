@@ -5,14 +5,6 @@
 
 namespace dsm {
 
-/**
- * @brief Lightweight identifier for a distributed shared object.
- *
- * For now this is just a string wrapper. Later, if you switch to a
- * protobuf-generated type, you can either:
- *  - adapt this class to wrap that type, or
- *  - replace uses of ObjectId with your proto type and adjust a bit.
- */
     class ObjectId {
     public:
         ObjectId() = default;
@@ -20,10 +12,8 @@ namespace dsm {
         explicit ObjectId(std::string name)
                 : name_(std::move(name)) {}
 
-        // Access underlying string
         const std::string& str() const noexcept { return name_; }
 
-        // For convenience: implicit conversion to string if you like
         operator const std::string&() const noexcept { return name_; }
 
         bool operator==(const ObjectId& other) const noexcept {
@@ -40,7 +30,6 @@ namespace dsm {
 
 } // namespace dsm
 
-// Allow ObjectId to be used as a key in unordered_map / unordered_set
 namespace std {
 
     template<>

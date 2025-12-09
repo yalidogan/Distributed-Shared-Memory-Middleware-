@@ -1,4 +1,4 @@
-#include "GrpcDsmNetwork.h"
+#include "../../include/net/GrpcDsmNetwork.h"
 #include <iostream>
 
 namespace dsm {
@@ -30,7 +30,7 @@ namespace dsm {
         grpc::ClientContext context;
         DsmFetchRequest request;
         request.set_object_name(id.str());
-        request.set_requester_node_id(my_node_id_); // Critical for Stage 3 caching
+        request.set_requester_node_id(my_node_id_);
 
         DsmFetchReply response;
         grpc::Status status = stub->ReceiveDsmFetch(&context, request, &response);
@@ -43,6 +43,9 @@ namespace dsm {
         return "";
     }
 
+// ----------------------------------------------------------------
+// WRITE OPERATIONS
+// ----------------------------------------------------------------
     void GrpcDsmNetwork::sendWriteToHome(int home_node_id, const ObjectId& id, const std::string& value_bytes) {
         auto stub = getStub(home_node_id);
         if (!stub) return;
@@ -76,6 +79,44 @@ namespace dsm {
 
         if (!status.ok()) {
             std::cerr << "[Net] CacheUpdate failed: " << status.error_message() << std::endl;
+        }
+    }
+
+// ----------------------------------------------------------------
+// REMOVE OPERATIONS
+// ----------------------------------------------------------------
+    void GrpcDsmNetwork::sendRemoveToHome(int home_node_id, const ObjectId& id) {
+        auto stub = getStub(home_node_id);
+        if (!stub) return;
+
+        grpc::ClientContext context;
+        DsmUpdateMsg request;
+        request.set_object_name(id.str());
+        request.set_sender_node_id(my_node_id_);
+        // No data needed
+
+        Empty response;
+        grpc::Status status = stub->ReceiveRemoveToHome(&context, request, &response);
+
+        if (!status.ok()) {
+            std::cerr << "[Net] RemoveToHome failed: " << status.error_message() << std::endl;
+        }
+    }
+
+    void GrpcDsmNetwork::sendCacheRemove(int cache_node_id, const ObjectId& id) {
+        auto stub = getStub(cache_node_id);
+        if (!stub) return;
+
+        grpc::ClientContext context;
+        DsmUpdateMsg request;
+        request.set_object_name(id.str());
+        request.set_sender_node_id(my_node_id_);
+
+        Empty response;
+        grpc::Status status = stub->ReceiveCacheRemove(&context, request, &response);
+
+        if (!status.ok()) {
+            std::cerr << "[Net] CacheRemove failed: " << status.error_message() << std::endl;
         }
     }
 
