@@ -23,6 +23,9 @@ namespace dsm {
 
         virtual void sendRemoveToHome(int home_node_id, const ObjectId& id) = 0;
         virtual void sendCacheRemove(int cache_node_id, const ObjectId& id) = 0;
+
+        virtual void sendLockAcquire(int home_id, const ObjectId& id, bool is_write_lock) = 0;
+        virtual void sendLockRelease(int home_id, const ObjectId& id, bool is_write_lock) = 0;
     };
 
 } // namespace dsm

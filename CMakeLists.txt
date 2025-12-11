@@ -50,6 +50,7 @@ add_executable(dsm_node
         src/dsm/DsmCore.cpp
         src/net/GrpcDsmNetwork.cpp
         src/net/DsmServiceImpl.cpp
+        src/sync/LockManager.cpp
         ${dsm_proto_srcs}
         ${dsm_grpc_srcs}
 )

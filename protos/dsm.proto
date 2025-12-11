@@ -3,8 +3,8 @@ package dsm;
 
 service DSMService {
   // RA (Future work)
-  rpc ReceiveRaRequest(RaRequestMsg) returns (Empty);
-  rpc ReceiveRaReply(RaReplyMsg) returns (Empty);
+  rpc ReceiveLockAcquire(LockRequest) returns (Empty);
+  rpc ReceiveLockRelease(LockRequest) returns (Empty);
 
   // DSM Core Logic
   // Used when a node wants to write to the Home (to update canonical)
@@ -22,13 +22,10 @@ service DSMService {
 
 message Empty {}
 
-message RaRequestMsg {
-  int32 node_id = 1;
-  int32 timestamp = 2;
-}
-
-message RaReplyMsg {
-  int32 node_id = 1;
+message LockRequest {
+  int32 client_id = 1;
+  string object_id = 2;
+  bool is_write_lock = 3;
 }
 
 message DsmUpdateMsg {

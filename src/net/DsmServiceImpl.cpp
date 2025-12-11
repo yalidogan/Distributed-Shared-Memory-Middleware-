@@ -28,11 +28,13 @@ grpc::Status DsmServiceImpl::ReceiveCacheUpdate(grpc::ServerContext* context, co
     return grpc::Status::OK;
 }
 
-grpc::Status DsmServiceImpl::ReceiveRaRequest(grpc::ServerContext* context, const dsm::RaRequestMsg* request, dsm::Empty* response) {
+grpc::Status DsmServiceImpl::ReceiveLockAcquire(grpc::ServerContext* context, const dsm::LockRequest* request, dsm::Empty* response) {
+    core_->onLockAcquire(request->client_id(), dsm::ObjectId(request->object_id()), request->is_write_lock());
     return grpc::Status::OK;
 }
 
-grpc::Status DsmServiceImpl::ReceiveRaReply(grpc::ServerContext* context, const dsm::RaReplyMsg* request, dsm::Empty* response) {
+grpc::Status DsmServiceImpl::ReceiveLockRelease(grpc::ServerContext* context, const dsm::LockRequest* request, dsm::Empty* response) {
+    core_->onLockRelease(request->client_id(), dsm::ObjectId(request->object_id()), request->is_write_lock());
     return grpc::Status::OK;
 }
 

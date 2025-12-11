@@ -6,7 +6,7 @@
 
 // --- Project Includes ---
 #include "include/dsm/DsmCore.h"
-#include "src/sync/DummyRaManager.h"
+#include "include/sync/LockManager.h"
 #include "include/net/GrpcDsmNetwork.h"
 #include "include/net/DsmServiceImpl.h"
 #include "src/utils/Config.h"
@@ -97,6 +97,8 @@ void runInteractive(DsmCore* core, int my_id) {
     std::cout << "    get <key>" << std::endl;
     std::cout << "    put <key> <value>" << std::endl;
     std::cout << "    rm  <key>" << std::endl;
+    std::cout << "    slowput <key> <value>  (Simulate long write 10 seconds)" << std::endl;
+    std::cout << "    slowget <key>          (Simulate long read 10 seconds)" << std::endl;
 
     while (true) {
         std::cout << "Node " << my_id << "> ";
@@ -123,6 +125,29 @@ void runInteractive(DsmCore* core, int my_id) {
                 *h = val;
                 // Destructor runs here: Sends update to Home + Releases Lock
                 std::cout << "   [WRITE] " << key << " <- " << val << " committed." << std::endl;
+            } catch (const std::exception& e) {
+                std::cout << "   [ERROR] " << e.what() << std::endl;
+            }
+        }
+        else if (cmd == "slowput") {
+            std::string key, val; std::cin >> key >> val;
+            try {
+                std::cout << "   [SLOW WRITE] Simulating long WRITE operation for 10 seconds" << std::endl;
+                auto h = core->getWrite<std::string>(ObjectId(key));
+                *h = val;
+                std::cout << "   [SLOW WRITE] " << key << " <- " << val << " committed." << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(10));
+            } catch (const std::exception& e) {
+                std::cout << "   [ERROR] " << e.what() << std::endl;
+            }
+        }
+        else if (cmd == "slowget") {
+            std::string key; std::cin >> key;
+            try {
+                std::cout << "   [SLOW READ] Simulating long READ operation for 10 seconds" << std::endl;
+                auto h = core->getRead<std::string>(ObjectId(key));
+                std::cout << "   [SLOW READ] " << key << " = '" << h.get() << "'" << std::endl;
+                std::this_thread::sleep_for(std::chrono::seconds(10));
             } catch (const std::exception& e) {
                 std::cout << "   [ERROR] " << e.what() << std::endl;
             }
@@ -159,8 +184,8 @@ int main(int argc, char** argv) {
 
     // 2. Initialize Components
     auto net = new GrpcDsmNetwork(my_id);
-    auto ra = new DummyRaManager();
-    auto core = new DsmCore(my_id, config.nodes.size(), ra, net);
+    auto lock = new LockManager();
+    auto core = new DsmCore(my_id, config.nodes.size(), lock, net);
     auto service = std::make_shared<DsmServiceImpl>(core);
 
     // 3. Start Server

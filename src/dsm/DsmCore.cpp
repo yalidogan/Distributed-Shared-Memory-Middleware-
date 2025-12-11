@@ -1,4 +1,5 @@
 #include "../../include/dsm/DsmCore.h"
+#include "../../include/sync/LockManager.h"
 #include <functional>
 #include <iostream>
 
@@ -14,8 +15,8 @@ inline uint32_t fnv1a_hash(const std::string& str) {
 
 namespace dsm {
 
-    DsmCore::DsmCore(int my_node_id, int total_nodes, RaManager* ra, DsmNetwork* net)
-            : my_id_(my_node_id), total_nodes_(total_nodes), ra_(ra), net_(net) {}
+    DsmCore::DsmCore(int my_node_id, int total_nodes, LockManager* lock, DsmNetwork* net)
+            : my_id_(my_node_id), total_nodes_(total_nodes), lock_(lock), net_(net) {}
 
     int DsmCore::homeFor(const ObjectId& id) const {
         uint32_t h = fnv1a_hash(id.str());
@@ -79,9 +80,22 @@ namespace dsm {
         }
     }
 
-    void DsmCore::releaseRawInternal(const ObjectId& id) {
-        // std::cout << "[DEBUG] Node " << my_id_ << ": Releasing Lock " << id.str() << std::endl;
-        ra_->release(id);
+    void DsmCore::releaseLockInternal(const ObjectId& id, bool is_write_lock) {
+        int home = homeFor(id);
+        if (home == my_id_) {
+            onLockRelease(my_id_, id, is_write_lock);
+        } else {
+            net_->sendLockRelease(home, id, is_write_lock);
+        }
+    }
+
+    void DsmCore::acquireLockInternal(const ObjectId& id, bool is_write_lock) {
+        int home = homeFor(id);
+        if (home == my_id_) {
+            onLockAcquire(my_id_, id, is_write_lock);
+        } else {
+            net_->sendLockAcquire(home, id, is_write_lock);
+        }
     }
 
 // ------------------------- Metadata (Home) ------------------------- //
@@ -155,6 +169,16 @@ namespace dsm {
         store_.put(id, value_bytes);
     }
 
+    void DsmCore::onLockRelease(int from_node_id, const ObjectId& id, bool is_write_lock) {
+        std::cout << "[DEBUG] Node " << my_id_ << ": Releasing Lock for object " << id.str() << std::endl;
+        lock_->release(id, is_write_lock);
+    }
+
+    void DsmCore::onLockAcquire(int from_node_id, const ObjectId& id, bool is_write_lock) {
+        std::cout << "[DEBUG] Node " << my_id_ << ": Acquiring Lock for object " << id.str() << std::endl;
+        lock_->acquire(id, is_write_lock);
+    }
+
 // --- Remove Logic ---
 
     void DsmCore::remove(const ObjectId& id) {
@@ -162,7 +186,7 @@ namespace dsm {
     }
 
     void DsmCore::removeRaw(const ObjectId& id) {
-        ra_->acquire(id);
+        acquireLockInternal(id, true); // Writer lock
         int home = homeFor(id);
 
         if (home == my_id_) {
@@ -176,7 +200,7 @@ namespace dsm {
             net_->sendRemoveToHome(home, id);
             store_.erase(id);
         }
-        ra_->release(id);
+        releaseLockInternal(id, true); // Release writer lock
     }
 
     void DsmCore::onRemoveToHome(int from_node_id, const ObjectId& id) {

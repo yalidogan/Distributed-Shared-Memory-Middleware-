@@ -15,8 +15,8 @@ public:
     grpc::Status ReceiveCacheUpdate(grpc::ServerContext* context, const dsm::DsmUpdateMsg* request, dsm::Empty* response) override;
 
     // RA Stubs
-    grpc::Status ReceiveRaRequest(grpc::ServerContext* context, const dsm::RaRequestMsg* request, dsm::Empty* response) override;
-    grpc::Status ReceiveRaReply(grpc::ServerContext* context, const dsm::RaReplyMsg* request, dsm::Empty* response) override;
+    grpc::Status ReceiveLockAcquire(grpc::ServerContext* context, const dsm::LockRequest* request, dsm::Empty* response) override;
+    grpc::Status ReceiveLockRelease(grpc::ServerContext* context, const dsm::LockRequest* request, dsm::Empty* response) override;
 
     grpc::Status ReceiveRemoveToHome(grpc::ServerContext* context, const dsm::DsmUpdateMsg* request, dsm::Empty* response) override;
     grpc::Status ReceiveCacheRemove(grpc::ServerContext* context, const dsm::DsmUpdateMsg* request, dsm::Empty* response) override;

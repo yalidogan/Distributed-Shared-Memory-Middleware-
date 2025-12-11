@@ -120,4 +120,41 @@ namespace dsm {
         }
     }
 
+    // LOCK OPERATIONS
+    void GrpcDsmNetwork::sendLockAcquire(int home_id, const ObjectId& id, bool is_write_lock) {
+        auto stub = getStub(home_id);
+        if (!stub) return;
+
+        grpc::ClientContext context;
+        LockRequest request;
+        request.set_client_id(my_node_id_);
+        request.set_object_id(id.str());
+        request.set_is_write_lock(is_write_lock);
+
+        Empty response;
+        grpc::Status status = stub->ReceiveLockAcquire(&context, request, &response);
+
+        if (!status.ok()) {
+            std::cerr << "[Net] LockRequest failed: " << status.error_message() << std::endl;
+        }
+    }
+
+    void GrpcDsmNetwork::sendLockRelease(int home_id, const ObjectId& id, bool is_write_lock) {
+        auto stub = getStub(home_id);
+        if (!stub) return;
+
+        grpc::ClientContext context;
+        LockRequest request;
+        request.set_client_id(my_node_id_);
+        request.set_object_id(id.str());
+        request.set_is_write_lock(is_write_lock);
+
+        Empty response;
+        grpc::Status status = stub->ReceiveLockRelease(&context, request, &response);
+
+        if (!status.ok()) {
+            std::cerr << "[Net] LockRelease failed: " << status.error_message() << std::endl;
+        }
+    }
+
 } // namespace dsm

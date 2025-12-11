@@ -27,7 +27,8 @@ namespace dsm {
         void sendCacheRemove(int cache_node_id, const ObjectId& id) override;
 
         // Locking Operations (For Home-Based Locking)
-        // void sendLockRequest(int home_id, const ObjectId& id, LockType type) override;
+        void sendLockAcquire(int home_id, const ObjectId& id, bool is_write_lock) override;
+        void sendLockRelease(int home_id, const ObjectId& id, bool is_write_lock) override;
 
     private:
         int my_node_id_;

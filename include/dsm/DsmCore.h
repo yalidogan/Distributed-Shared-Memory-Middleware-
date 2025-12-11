@@ -9,7 +9,7 @@
 #include "ObjectId.h"
 #include "ObjectStore.h"
 #include "Serialization.h"
-#include "../sync/RaManager.h"
+#include "../sync/LockManager.h"
 #include "../net/DsmNetwork.h"
 
 #include "DsmHandle.h"
@@ -22,7 +22,7 @@ namespace dsm {
 
     class DsmCore {
     public:
-        DsmCore(int my_node_id, int total_nodes, RaManager* ra, DsmNetwork* net);
+        DsmCore(int my_node_id, int total_nodes, LockManager* ra, DsmNetwork* net);
 
 
         template <typename T>
@@ -33,7 +33,10 @@ namespace dsm {
         DsmHandle<T> getWrite(const ObjectId& id);
 
         void putRawInternal(const ObjectId& id, const std::string& bytes);
-        void releaseRawInternal(const ObjectId& id);
+        
+        // Lock Managers
+        void releaseLockInternal(const ObjectId& id, bool is_write_lock);
+        void acquireLockInternal(const ObjectId& id, bool is_write_lock);
 
         // -----------------------------------------------------------
         // NETWORK HANDLERS
@@ -45,6 +48,9 @@ namespace dsm {
         void onRemoveToHome(int from_node_id, const ObjectId& id);
         void onCacheRemove(const ObjectId& id);
 
+        void onLockRelease(int from_node_id, const ObjectId& id, bool is_write_lock);
+        void onLockAcquire(int from_node_id, const ObjectId& id, bool is_write_lock);
+
         // Public Remove API
         void remove(const ObjectId& id);
         bool exists(const ObjectId& id) const { return store_.exists(id); }
@@ -52,7 +58,7 @@ namespace dsm {
     private:
         int my_id_;
         int total_nodes_;
-        RaManager* ra_;
+        LockManager* lock_;
         DsmNetwork* net_;
         ObjectStore store_;
 
@@ -79,13 +85,13 @@ namespace dsm {
             core_->putRawInternal(id_, serialize(value_));
         }
 
-        core_->releaseRawInternal(id_);
+        core_->releaseLockInternal(id_, is_writable_);
     }
 
     template <typename T>
     DsmHandle<T> DsmCore::getRead(const ObjectId& id) {
-        ra_->acquire(id);
-
+        acquireLockInternal(id, false);
+        
         std::string bytes = fetchRawInternal(id);
 
         T val{};
@@ -98,7 +104,7 @@ namespace dsm {
 
     template <typename T>
     DsmHandle<T> DsmCore::getWrite(const ObjectId& id) {
-        ra_->acquire(id);
+        acquireLockInternal(id, true);
 
         std::string bytes = fetchRawInternal(id);
 
