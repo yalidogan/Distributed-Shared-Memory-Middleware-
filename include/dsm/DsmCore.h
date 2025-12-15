@@ -66,6 +66,7 @@ namespace dsm {
         std::mutex meta_mtx_;
 
         int homeFor(const ObjectId& id) const;
+        int backupFor(const ObjectId& id) const;
         void registerCacheNode(const ObjectId& id, int node_id);
         std::vector<int> cachedNodesFor(const ObjectId& id);
 
