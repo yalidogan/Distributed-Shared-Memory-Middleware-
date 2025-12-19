@@ -59,3 +59,47 @@ target_link_libraries(dsm_node
         protobuf::libprotobuf
         gRPC::grpc++
 )
+
+
+
+add_executable(demo_gui
+        demo_gui.cpp
+        src/dsm/DsmCore.cpp
+        src/net/GrpcDsmNetwork.cpp
+        src/net/DsmServiceImpl.cpp
+        src/sync/LockManager.cpp
+        ${dsm_proto_srcs}
+        ${dsm_grpc_srcs}
+)
+
+target_include_directories(demo_gui PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${PROTO_BINARY_DIR}
+)
+
+target_link_libraries(demo_gui PRIVATE
+        protobuf::libprotobuf
+        gRPC::grpc++
+)
+
+add_executable(dsm_headless
+        dsm_headless.cpp
+        src/dsm/DsmCore.cpp
+        src/net/GrpcDsmNetwork.cpp
+        src/net/DsmServiceImpl.cpp
+        src/sync/LockManager.cpp
+        ${dsm_proto_srcs}
+        ${dsm_grpc_srcs}
+)
+
+target_include_directories(dsm_headless PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${PROTO_BINARY_DIR}
+)
+
+target_link_libraries(dsm_headless PRIVATE
+        protobuf::libprotobuf
+        gRPC::grpc++
+)

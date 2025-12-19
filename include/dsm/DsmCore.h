@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <mutex>
 #include <vector>
+#include <iostream>
 
 #include "ObjectId.h"
 #include "ObjectStore.h"
@@ -55,6 +56,10 @@ namespace dsm {
         void remove(const ObjectId& id);
         bool exists(const ObjectId& id) const { return store_.exists(id); }
 
+        std::unordered_map<ObjectId, std::string> debugGetCache() {
+            return store_.getSnapshot();
+        }
+
     private:
         int my_id_;
         int total_nodes_;
@@ -76,17 +81,34 @@ namespace dsm {
     };
 
 
+    // [Replace the existing ~DsmHandle implementation at the bottom of DsmCore.h with this]
 
     template <typename T>
     DsmHandle<T>::~DsmHandle() {
         if (!core_) return;
 
         if (modified_ && is_writable_) {
-            // Serialize and push
-            core_->putRawInternal(id_, serialize(value_));
+            try {
+                // Serialize and push
+                core_->putRawInternal(id_, serialize(value_));
+            } catch (const std::exception& e) {
+                // LOGGING: In production, use a logger. Here we print to stderr.
+                // We MUST catch this because throwing in a destructor terminates the program.
+                std::cerr << "[DSM Error] Failed to write-back handle "
+                          << id_.str() << ": " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "[DSM Error] Unknown error during write-back of "
+                          << id_.str() << std::endl;
+            }
         }
 
-        core_->releaseLockInternal(id_, is_writable_);
+        // 2. Lock Release Phase (Always Attempt)
+        try {
+            core_->releaseLockInternal(id_, is_writable_);
+        } catch (...) {
+            std::cerr << "[DSM Error] Failed to release lock for "
+                      << id_.str() << std::endl;
+        }
     }
 
     template <typename T>

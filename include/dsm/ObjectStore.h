@@ -57,6 +57,11 @@ namespace dsm {
             return true;
         }
 
+        std::unordered_map<ObjectId, std::string> getSnapshot() const {
+            std::lock_guard<std::mutex> lock(mtx_);
+            return objects_; // Return a copy for display purposes
+        }
+
     private:
         // Mutable because get()/exists() are logically const, but need to lock.
         mutable std::mutex mtx_;

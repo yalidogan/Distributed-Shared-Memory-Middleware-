@@ -239,7 +239,11 @@ namespace dsm {
     }
 
     void DsmCore::onLockAcquire(int from_node_id, const ObjectId& id, bool is_write_lock) {
-        std::cout << "[DEBUG] Node " << my_id_ << ": Node "<< from_node_id << " is acquiring Lock for object " << id.str() << std::endl;
+        std::cout << "[DEBUG] Node " << my_id_ << ": Node "<< from_node_id
+                  << " is acquiring Lock for object " << id.str() << std::endl;
+
+        registerCacheNode(id, from_node_id);
+
         lock_->acquire(id, is_write_lock);
     }
 
