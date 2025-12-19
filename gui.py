@@ -15,6 +15,7 @@ class DsmGui:
         self.root.title(f"DSM Node {node_id} - Dashboard")
         self.root.geometry("600x700")
 
+        # --- Styles for Dark Mode ---
         style = ttk.Style()
         style.configure("Treeview",
                         background="#2e2e2e",
@@ -30,16 +31,19 @@ class DsmGui:
         style.configure("Blue.TLabel", foreground="#4488ff", font=("Arial", 12, "bold"))
         style.configure("Std.TLabel", foreground="#eeeeee", font=("Courier", 12, "bold"))
 
+        # --- Top: Status Bar ---
         self.status_frame = ttk.LabelFrame(root, text="System Status")
         self.status_frame.pack(fill="x", padx=10, pady=5)
         self.lbl_status = ttk.Label(self.status_frame, text="STARTING...", style="Blue.TLabel")
         self.lbl_status.pack(pady=5)
 
+        # --- Result Output ---
         self.result_frame = ttk.LabelFrame(root, text="Server Response")
         self.result_frame.pack(fill="x", padx=10, pady=5)
         self.lbl_result = ttk.Label(self.result_frame, text="Ready.", style="Std.TLabel")
         self.lbl_result.pack(pady=5)
 
+        # --- Middle: Local Storage Table ---
         self.cache_frame = ttk.LabelFrame(root, text="Node Storage (Home & Cache)")
         self.cache_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -52,14 +56,17 @@ class DsmGui:
         self.tree.column("Value", width=200)
         self.tree.column("Role", width=120)
 
+        # Dark Backgrounds for Rows
         self.tree.tag_configure('home_row', background='#1e4d2b', foreground='white')
         self.tree.tag_configure('backup_row', background='#5c3a00', foreground='white')
 
         self.tree.pack(fill="both", expand=True, padx=5, pady=5)
 
+        # --- Bottom: Controls ---
         self.ctrl_frame = ttk.LabelFrame(root, text="Operations")
         self.ctrl_frame.pack(fill="x", padx=10, pady=5)
 
+        # Inputs
         tk.Label(self.ctrl_frame, text="Key:").grid(row=0, column=0, padx=5, pady=5)
         self.entry_key = tk.Entry(self.ctrl_frame, width=15)
         self.entry_key.grid(row=0, column=1, padx=5, pady=5)
@@ -68,6 +75,7 @@ class DsmGui:
         self.entry_val = tk.Entry(self.ctrl_frame, width=15)
         self.entry_val.grid(row=0, column=3, padx=5, pady=5)
 
+        # Buttons
         self.btn_get = ttk.Button(self.ctrl_frame, text="GET", command=self.do_get)
         self.btn_get.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
 
@@ -79,6 +87,9 @@ class DsmGui:
 
         self.btn_slow_put = ttk.Button(self.ctrl_frame, text="SLOW WRITE (5s)", command=self.do_slow_put)
         self.btn_slow_put.grid(row=1, column=3, sticky="ew", padx=5, pady=5)
+
+        self.btn_del = ttk.Button(self.ctrl_frame, text="DELETE OBJECT", command=self.do_delete)
+        self.btn_del.grid(row=2, column=0, columnspan=4, sticky="ew", padx=5, pady=5)
 
         self.start_cpp_process()
 
@@ -114,7 +125,7 @@ class DsmGui:
     def handle_update(self, msg_type, payload):
         if msg_type == "STATUS":
             self.lbl_status.config(text=payload)
-            if "LOCKING" in payload or "HELD" in payload:
+            if "LOCKING" in payload or "HELD" in payload or "DELETING" in payload:
                 self.lbl_status.config(style="Red.TLabel")
             elif "IDLE" in payload:
                 self.lbl_status.config(style="Green.TLabel")
@@ -131,6 +142,15 @@ class DsmGui:
             parts = payload.split("|")
             if len(parts) >= 3:
                 self.update_tree(parts[0], parts[1], parts[2])
+
+        elif msg_type == "REMOVE":
+            # --- FIX: Delete row from table ---
+            key_to_remove = payload.strip()
+            for item in self.tree.get_children():
+                item_key = self.tree.item(item, "values")[0]
+                if item_key == key_to_remove:
+                    self.tree.delete(item)
+                    break
 
         elif msg_type == "ERROR":
             self.lbl_status.config(text=f"ERROR: {payload}", style="Red.TLabel")
@@ -165,6 +185,10 @@ class DsmGui:
     def do_slow_put(self):
         if (k := self.entry_key.get()) and (v := self.entry_val.get()):
             self.send_cmd(f"slowput {k} {v}")
+
+    def do_delete(self):
+        if k := self.entry_key.get():
+            self.send_cmd(f"rm {k}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

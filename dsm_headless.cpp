@@ -6,6 +6,7 @@
 #include <mutex>
 #include <sstream>
 #include <atomic>
+#include <unordered_map>
 
 // --- Project Includes ---
 #include "include/dsm/DsmCore.h"
@@ -49,21 +50,46 @@ void sendToGui(const std::string& type, const std::string& payload) {
     std::cout << type << "|" << payload << std::endl;
 }
 
-// --- Status Monitor ---
+// --- Status Monitor (FIXED: Now detects deletions) ---
 void monitorLoop(DsmCore* core) {
+    // Keep a snapshot of what we last sent to GUI
+    std::unordered_map<std::string, std::string> last_snapshot;
+
     while (g_running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(250)); // Faster refresh
 
-        auto current_cache = core->debugGetCache();
+        // 1. Get current state from Core
+        auto current_objs = core->debugGetCache();
+        std::unordered_map<std::string, std::string> current_snapshot;
 
-        for (const auto& kv : current_cache) {
-            std::string key = kv.first.str();
-            std::string val = kv.second;
-            std::string role = getRole(key);
-
-            // Format: CACHE|key|value|role
-            sendToGui("CACHE", key + "|" + val + "|" + role);
+        // Convert ObjectId map to String map for easier comparison
+        for(const auto& kv : current_objs) {
+            current_snapshot[kv.first.str()] = kv.second;
         }
+
+        // 2. Detect NEW or UPDATED items
+        for (const auto& kv : current_snapshot) {
+            const std::string& key = kv.first;
+            const std::string& val = kv.second;
+
+            // If key didn't exist before OR value changed
+            if (last_snapshot.find(key) == last_snapshot.end() || last_snapshot[key] != val) {
+                std::string role = getRole(key);
+                sendToGui("CACHE", key + "|" + val + "|" + role);
+            }
+        }
+
+        // 3. Detect DELETED items
+        // If it was in last_snapshot but NOT in current_snapshot, it's gone.
+        for (const auto& kv : last_snapshot) {
+            const std::string& key = kv.first;
+            if (current_snapshot.find(key) == current_snapshot.end()) {
+                sendToGui("REMOVE", key);
+            }
+        }
+
+        // 4. Update snapshot
+        last_snapshot = current_snapshot;
     }
 }
 
@@ -115,12 +141,14 @@ int main(int argc, char** argv) {
         try {
             if (cmd == "get") {
                 ss >> key;
-                sendToGui("STATUS", "LOCKING (READ)...");
+                bool is_hit = core->exists(ObjectId(key));
+                std::string source = is_hit ? "[CACHE HIT]" : "[FETCHED FROM REMOTE]";
+
+                sendToGui("STATUS", is_hit ? "READING (CACHE HIT)..." : "READING (FETCHING)...");
                 {
                     auto h = core->getRead<std::string>(ObjectId(key));
-                    // CHECK IF FOUND: If it's not in store after a fetch, it doesn't exist.
                     if (core->exists(ObjectId(key))) {
-                        sendToGui("RESULT", "Read: " + key + " = " + h.get());
+                        sendToGui("RESULT", "Read: " + key + " = " + h.get() + "  " + source);
                     } else {
                         sendToGui("RESULT", "Read: " + key + " NOT FOUND");
                     }
@@ -129,13 +157,16 @@ int main(int argc, char** argv) {
             }
             else if (cmd == "slowget") {
                 ss >> key;
+                bool is_hit = core->exists(ObjectId(key));
+                std::string source = is_hit ? "[CACHE HIT]" : "[FETCHED FROM REMOTE]";
+
                 sendToGui("STATUS", "READ LOCK HELD (5s)...");
                 {
                     auto h = core->getRead<std::string>(ObjectId(key));
                     std::this_thread::sleep_for(std::chrono::seconds(5));
 
                     if (core->exists(ObjectId(key))) {
-                        sendToGui("RESULT", "Read: " + key + " = " + h.get());
+                        sendToGui("RESULT", "Read: " + key + " = " + h.get() + "  " + source);
                     } else {
                         sendToGui("RESULT", "Read: " + key + " NOT FOUND");
                     }
@@ -161,6 +192,13 @@ int main(int argc, char** argv) {
                     *h = val;
                 }
                 sendToGui("RESULT", "Write Committed: " + key);
+                sendToGui("STATUS", "IDLE");
+            }
+            else if (cmd == "rm") {
+                ss >> key;
+                sendToGui("STATUS", "DELETING...");
+                core->remove(ObjectId(key));
+                sendToGui("RESULT", "Deleted: " + key);
                 sendToGui("STATUS", "IDLE");
             }
         } catch (const std::exception& e) {
